@@ -1,0 +1,20 @@
+Dataset/
+runs/
+training/
+test_images/
+tests/
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+.git/
+
+# Keep deployment small. Copy or mount only the inference weights you need.
+weights/**
+!weights/
+!weights/base/
+!weights/special/
+!weights/base/yolov10n.pt
+!weights/lion_tiger_best.pt
+!weights/special/*.pt

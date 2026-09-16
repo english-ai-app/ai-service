@@ -1,22 +1,54 @@
 from functools import lru_cache
-from typing import List
+from pathlib import Path
+from typing import List, Tuple
 
 from ultralytics import YOLO
 
 from src.core.config import get_settings
 from src.schemas.detection import BoundingBox, DetectedLabel
 
+LABEL_ALIASES = {
+    "computer mouse": "mouse",
+    "remote control": "remote",
+    "mobile phone": "cell phone",
+    "phone": "cell phone",
+}
+
 
 @lru_cache(maxsize=1)
-def get_model() -> YOLO:
+def get_base_model() -> YOLO:
     settings = get_settings()
     return YOLO(settings.yolo_model_path)
 
 
-def detect_labels(image_path: str) -> List[DetectedLabel]:
+@lru_cache(maxsize=16)
+def load_model(model_path: str) -> YOLO:
+    return YOLO(model_path)
+
+
+def get_special_models() -> List[Tuple[str, YOLO]]:
     settings = get_settings()
-    model = get_model()
-    results = model.predict(image_path, conf=settings.yolo_confidence, verbose=False)
+    if not settings.special_detector_enabled:
+        return []
+
+    models = []
+    for model_path_value in settings.special_model_paths:
+        model_path = Path(model_path_value)
+        if model_path.exists():
+            models.append((str(model_path), load_model(str(model_path))))
+
+    return models
+
+
+def predict_labels(model: YOLO, image_path: str, confidence: float) -> List[DetectedLabel]:
+    settings = get_settings()
+    results = model.predict(
+        image_path,
+        conf=confidence,
+        imgsz=settings.yolo_image_size,
+        max_det=settings.yolo_max_detections,
+        verbose=False,
+    )
     labels = []
 
     for result in results:
@@ -25,9 +57,10 @@ def detect_labels(image_path: str) -> List[DetectedLabel]:
         for box in result.boxes:
             class_id = int(box.cls[0].item())
             x1, y1, x2, y2 = box.xyxy[0].tolist()
+            label = LABEL_ALIASES.get(names[class_id], names[class_id])
             labels.append(
                 DetectedLabel(
-                    label=names[class_id],
+                    label=label,
                     confidence=round(float(box.conf[0].item()), 4),
                     boundingBox=BoundingBox(
                         x=round(max(x1 / image_width, 0.0), 4),
@@ -39,6 +72,41 @@ def detect_labels(image_path: str) -> List[DetectedLabel]:
             )
 
     return merge_duplicate_labels(labels)
+
+
+def detect_special_labels(image_path: str) -> Tuple[List[DetectedLabel], str]:
+    settings = get_settings()
+    best_labels: List[DetectedLabel] = []
+    best_source = ""
+    best_confidence = 0.0
+
+    for model_path, model in get_special_models():
+        labels = predict_labels(model, image_path, settings.special_confidence)
+        special_labels = [label for label in labels if label.label.lower() in settings.special_labels]
+        if not special_labels:
+            continue
+
+        top_confidence = max(label.confidence for label in special_labels)
+        if top_confidence > best_confidence:
+            best_labels = special_labels
+            best_source = f"special:{model_path}"
+            best_confidence = top_confidence
+
+    return best_labels, best_source
+
+
+def detect_labels_with_source(image_path: str) -> Tuple[List[DetectedLabel], str]:
+    settings = get_settings()
+    special_labels, special_source = detect_special_labels(image_path)
+    if special_labels:
+        return special_labels, special_source
+
+    return predict_labels(get_base_model(), image_path, settings.yolo_confidence), "base"
+
+
+def detect_labels(image_path: str) -> List[DetectedLabel]:
+    labels, _ = detect_labels_with_source(image_path)
+    return labels
 
 
 def merge_duplicate_labels(labels: List[DetectedLabel]) -> List[DetectedLabel]:

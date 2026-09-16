@@ -27,3 +27,14 @@ htmlcov/
 
 # YOLO / model files
 runs/
+training/runs/
+Dataset/
+datasets/
+*.pt
+!weights/base/yolov10n.pt
+!weights/lion_tiger_best.pt
+!weights/special/*.pt
+
+# Local detector test images
+test_images/*
+!test_images/.gitkeep
