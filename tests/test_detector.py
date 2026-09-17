@@ -42,7 +42,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Test detector fallback flow on an image or folder.")
     parser.add_argument("path", nargs="?", default="test_images")
     parser.add_argument("--base-model", help="Override YOLO_MODEL_PATH for this test run.")
-    parser.add_argument("--special-model", help="Override SPECIAL_MODEL_PATH for this test run.")
+    parser.add_argument("--special-model", help="Override SPECIAL_MODEL_PATHS for this test run.")
     parser.add_argument("--confidence", help="Override YOLO_CONFIDENCE for this test run.")
     parser.add_argument("--special-confidence", help="Override SPECIAL_CONFIDENCE for this test run.")
     parser.add_argument("--disable-special", action="store_true", help="Run only the base detector.")
@@ -51,7 +51,7 @@ def main() -> None:
     if args.base_model:
         os.environ["YOLO_MODEL_PATH"] = args.base_model
     if args.special_model:
-        os.environ["SPECIAL_MODEL_PATH"] = args.special_model
+        os.environ["SPECIAL_MODEL_PATHS"] = args.special_model
     if args.confidence:
         os.environ["YOLO_CONFIDENCE"] = args.confidence
     if args.special_confidence:

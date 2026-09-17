@@ -22,7 +22,7 @@ Default settings:
 
 ```env
 SPECIAL_DETECTOR_ENABLED=true
-SPECIAL_MODEL_PATHS=weights/lion_tiger_best.pt
+SPECIAL_MODEL_PATHS=weights/lion_best.pt,weights/tiger_best.pt
 SPECIAL_CONFIDENCE=0.70
 SPECIAL_LABELS=lion,tiger
 YOLO_MODEL_PATH=weights/base/yolov10n.pt
@@ -32,7 +32,7 @@ YOLO_CONFIDENCE=0.35
 For multiple trained `.pt` files, separate them with commas:
 
 ```env
-SPECIAL_MODEL_PATHS=weights/special/lion_tiger_best.pt,weights/special/another_best.pt
+SPECIAL_MODEL_PATHS=weights/special/lion_best.pt,weights/special/tiger_best.pt,weights/special/another_best.pt
 ```
 
 The API uses `src/services/yolo_detector.py` only for inference. Training and manual model checks live outside `src` so they do not need to be deployed with the backend.
@@ -74,19 +74,19 @@ weights/lion_tiger_best.pt
 After training, test the full fallback flow:
 
 ```powershell
-.\venv\Scripts\python.exe tests\test_detector.py test_images --special-model weights\lion_tiger_best.pt
+.\venv\Scripts\python.exe tests\test_detector.py test_images --special-model weights\lion_best.pt,weights\tiger_best.pt
 ```
 
 To test multiple special models:
 
 ```powershell
-.\venv\Scripts\python.exe tests\test_detector.py test_images --special-model weights\special\lion_tiger_best.pt --special-model weights\special\another_best.pt
+.\venv\Scripts\python.exe tests\test_detector.py test_images --special-model weights\special\lion_best.pt,weights\special\tiger_best.pt,weights\special\another_best.pt
 ```
 
 You can also test a single image:
 
 ```powershell
-.\venv\Scripts\python.exe tests\test_detector.py test_images\example.jpg --special-model weights\lion_tiger_best.pt
+.\venv\Scripts\python.exe tests\test_detector.py test_images\example.jpg --special-model weights\lion_best.pt,weights\tiger_best.pt
 ```
 
 ## Deployment layout
@@ -96,7 +96,8 @@ Deploy the API code and only the inference weights required at runtime:
 ```text
 src/
 weights/base/yolov10n.pt
-weights/lion_tiger_best.pt
+weights/lion_best.pt
+weights/tiger_best.pt
 weights/special/*.pt
 requirements.txt
 ```

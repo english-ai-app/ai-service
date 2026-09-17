@@ -76,32 +76,29 @@ def predict_labels(model: YOLO, image_path: str, confidence: float) -> List[Dete
 
 def detect_special_labels(image_path: str) -> Tuple[List[DetectedLabel], str]:
     settings = get_settings()
-    best_labels: List[DetectedLabel] = []
-    best_source = ""
-    best_confidence = 0.0
+    labels: List[DetectedLabel] = []
+    sources: List[str] = []
 
     for model_path, model in get_special_models():
-        labels = predict_labels(model, image_path, settings.special_confidence)
-        special_labels = [label for label in labels if label.label.lower() in settings.special_labels]
+        model_labels = predict_labels(model, image_path, settings.special_confidence)
+        special_labels = [label for label in model_labels if label.label.lower() in settings.special_labels]
         if not special_labels:
             continue
 
-        top_confidence = max(label.confidence for label in special_labels)
-        if top_confidence > best_confidence:
-            best_labels = special_labels
-            best_source = f"special:{model_path}"
-            best_confidence = top_confidence
+        labels.extend(special_labels)
+        sources.append(f"special:{model_path}")
 
-    return best_labels, best_source
+    return merge_overlapping_labels(labels), ",".join(sources)
 
 
 def detect_labels_with_source(image_path: str) -> Tuple[List[DetectedLabel], str]:
     settings = get_settings()
     special_labels, special_source = detect_special_labels(image_path)
-    if special_labels:
-        return special_labels, special_source
+    base_labels = predict_labels(get_base_model(), image_path, settings.yolo_confidence)
+    labels = merge_overlapping_labels([*special_labels, *base_labels])
 
-    return predict_labels(get_base_model(), image_path, settings.yolo_confidence), "base"
+    sources = [source for source in [special_source, "base"] if source]
+    return labels, "+".join(sources)
 
 
 def detect_labels(image_path: str) -> List[DetectedLabel]:
@@ -110,9 +107,38 @@ def detect_labels(image_path: str) -> List[DetectedLabel]:
 
 
 def merge_duplicate_labels(labels: List[DetectedLabel]) -> List[DetectedLabel]:
-    best_by_label = {}
-    for label in labels:
-        current = best_by_label.get(label.label)
-        if current is None or label.confidence > current.confidence:
-            best_by_label[label.label] = label
-    return sorted(best_by_label.values(), key=lambda item: item.confidence, reverse=True)
+    return merge_overlapping_labels(labels)
+
+
+def box_iou(first: BoundingBox, second: BoundingBox) -> float:
+    first_x2 = first.x + first.width
+    first_y2 = first.y + first.height
+    second_x2 = second.x + second.width
+    second_y2 = second.y + second.height
+
+    intersection_width = max(0.0, min(first_x2, second_x2) - max(first.x, second.x))
+    intersection_height = max(0.0, min(first_y2, second_y2) - max(first.y, second.y))
+    intersection_area = intersection_width * intersection_height
+
+    first_area = first.width * first.height
+    second_area = second.width * second.height
+    union_area = first_area + second_area - intersection_area
+    if union_area <= 0:
+        return 0.0
+
+    return intersection_area / union_area
+
+
+def merge_overlapping_labels(labels: List[DetectedLabel]) -> List[DetectedLabel]:
+    settings = get_settings()
+    merged: List[DetectedLabel] = []
+
+    for label in sorted(labels, key=lambda item: item.confidence, reverse=True):
+        is_duplicate = any(
+            box_iou(label.boundingBox, current.boundingBox) >= settings.detection_merge_iou
+            for current in merged
+        )
+        if not is_duplicate:
+            merged.append(label)
+
+    return merged

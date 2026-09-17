@@ -20,9 +20,15 @@ class Settings:
         self.yolo_confidence = float(os.getenv("YOLO_CONFIDENCE", "0.35"))
         self.yolo_image_size = int(os.getenv("YOLO_IMAGE_SIZE", "960"))
         self.yolo_max_detections = int(os.getenv("YOLO_MAX_DETECTIONS", "20"))
+        self.detection_merge_iou = float(os.getenv("DETECTION_MERGE_IOU", "0.50"))
         self.special_detector_enabled = parse_bool(os.getenv("SPECIAL_DETECTOR_ENABLED", "true"))
-        self.special_model_path = os.getenv("SPECIAL_MODEL_PATH", "weights/lion_tiger_best.pt")
-        self.special_model_paths = parse_csv(os.getenv("SPECIAL_MODEL_PATHS", self.special_model_path))
+        self.special_model_path = os.getenv("SPECIAL_MODEL_PATH")
+        self.default_special_model_paths = "weights/lion_best.pt,weights/tiger_best.pt"
+        self.special_model_paths = parse_csv(
+            os.getenv("SPECIAL_MODEL_PATHS")
+            or self.special_model_path
+            or self.default_special_model_paths
+        )
         self.special_confidence = float(os.getenv("SPECIAL_CONFIDENCE", "0.70"))
         self.special_labels = {
             item.strip().lower()
